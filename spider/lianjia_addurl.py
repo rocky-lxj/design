@@ -6,48 +6,11 @@ from lxml import etree
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import TimeoutException
+import time
 import chardet
 import pandas as pd
 
-# 初始化 CSV 文件
-def init_csv():
-    if not os.path.exists('./lianjia_cityData.csv'):
-        with open('./lianjia_cityData.csv', 'w', encoding='utf-8', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(['quyulink', 'page'])
-
-# 获取 HTML 页面内容
-def get_html(url):
-    user_agent = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0'
-    ]
-    headers = {
-        "Accept": "application/json, text/javascript, */*; q=0.01",
-        "Accept-Encoding": "gzip, deflate, br, zstd",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
-        "Connection": "keep-alive",
-        "User-Agent": random.choice(user_agent)
-    }
-    session = requests.Session()
-    response = session.get(url, headers=headers)
-    response.encoding = chardet.detect(response.content)['encoding']
-    if response.status_code == 200:
-        return response.text
-    else:
-        return None
-
-# 解析 HTML 页面，获取城市链接和名称
-def parse_html1(html_text):
-    text = etree.HTML(html_text)
-    citylink = text.xpath('/html/body/div[3]/div/div[1]/dl[2]/dd/div/div/a/@href')
-    cityname = text.xpath('/html/body/div[3]/div/div[1]/dl[2]/dd/div/div/a/text()')
-    city_dict = {key: value for key, value in zip(citylink, cityname)}
-    # print(city_dict)
-    base_url = 'https://xz.lianjia.com'
-    for qu in citylink:
-        parse_html2(base_url + qu, city_dict[qu])
-
-# 初始化浏览器
 def init_browser():
     service = Service('./chromedriver.exe')
     options = webdriver.ChromeOptions()
@@ -56,10 +19,12 @@ def init_browser():
     options.add_argument('--disable-gpu')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--timeout=300')
     options.add_experimental_option('debuggerAddress', 'localhost:9222')  # 指定远程调试端口
-    return webdriver.Chrome(service=service, options=options)
-
-# 获取页面的总页数
+    driver = webdriver.Chrome(service=service, options=options)
+    driver.set_page_load_timeout(6000000)
+    driver.set_script_timeout(60000000)
+    return driver
 def get_page(url):
     browser = init_browser()
     try:
@@ -78,8 +43,43 @@ def get_page(url):
         print(f"An error occurred: {e}")
     finally:
         browser.quit()
+def init_csv():
+    if not os.path.exists('lianjia_addurl.csv'):
+        with open('lianjia_addurl.csv', 'w', encoding='utf-8', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['quyulink', 'page'])
 
-# 解析 HTML 页面，获取区域链接和总页数
+def get_html(url):
+    user_agent = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0'
+    ]
+    headers = {
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+        "Connection": "keep-alive",
+        "User-Agent": random.choice(user_agent)
+    }
+    session = requests.Session()
+    response = session.get(url, headers=headers)
+    response.encoding = chardet.detect(response.content)['encoding']
+    if response.status_code == 200:
+        return response.text
+    else:
+        return None
+def parse_html1(html_text):
+    text = etree.HTML(html_text)
+    citylink = text.xpath('/html/body/div[3]/div/div[1]/dl[2]/dd/div/div/a/@href')
+    cityname = text.xpath('/html/body/div[3]/div/div[1]/dl[2]/dd/div/div/a/text()')
+    city_dict = {key: value for key, value in zip(citylink, cityname)}
+    # print(city_dict)
+    base_url = 'https://xz.lianjia.com'
+    for qu in citylink:
+        parse_html2(base_url + qu, city_dict[qu])
+def clear():
+    df = pd.read_csv('./lianjia_addurl.csv')
+    df = df.drop_duplicates()
+    df.to_csv('./lianjia_addurl.csv', index=False)
 def parse_html2(url, name):
     browser = init_browser()
     try:
@@ -93,18 +93,13 @@ def parse_html2(url, name):
             print(new_url)
             page = get_page(new_url)
             print(page)
-            with open('./lianjia_cityData.csv', 'a', encoding='utf-8', newline='') as csvfile:
+            with open('lianjia_addurl.csv', 'a', encoding='utf-8', newline='') as csvfile:
                 writer = csv.writer(csvfile)
                 writer.writerow([new_url, int(page)])
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
         browser.quit()
-def clear():
-    df = pd.read_csv('./lianjia_cityData.csv')
-    df = df.drop_duplicates()
-    df.to_csv('./lianjia_cityData.csv', index=False)
-# 主函数
 def main():
     init_csv()
     url = 'https://xz.lianjia.com/ershoufang/'

@@ -15,26 +15,6 @@ def init_csv():
             writer = csv.writer(csvfile)
             writer.writerow(['quyulink', 'page'])
 
-# 获取 HTML 页面内容
-# def get_html(url):
-#     user_agent = [
-#         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0'
-#     ]
-#     headers = {
-#         "Accept": "application/json, text/javascript, */*; q=0.01",
-#         "Accept-Encoding": "gzip, deflate, br, zstd",
-#         "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
-#         "Connection": "keep-alive",
-#         "User-Agent": random.choice(user_agent)
-#     }
-#     session = requests.Session()
-#     response = session.get(url, headers=headers)
-#     response.encoding = chardet.detect(response.content)['encoding']
-#     if response.status_code == 200:
-#         return response.text
-#     else:
-#         return None
-
 # 解析 HTML 页面，获取城市链接和名称
 def parse_html1(html_text):
     text = etree.HTML(html_text)
@@ -99,7 +79,11 @@ def parse_html2(url, name):
         print(f"An error occurred: {e}")
     finally:
         browser.quit()
-
+def clear():
+    df = pd.read_csv('./lianjia_cityData.csv')
+    df = df.drop_duplicates()
+    df.to_csv('./lianjia_cityData.csv', index=False)
+    
 def main():
     init_csv()
     url = 'https://xuzhou.anjuke.com/'
@@ -112,6 +96,7 @@ def main():
         print(f"An error occurred: {e}")
     finally:
         browser.quit()
+    clear();
 
 if __name__ == '__main__':
     main()
